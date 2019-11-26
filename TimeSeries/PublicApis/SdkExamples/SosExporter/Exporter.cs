@@ -62,9 +62,9 @@ namespace SosExporter
         private IAquariusClient CreateConnectedAquariusClient()
         {
             var client = AquariusClient.CreateConnectedClient(
-                Context.Config.AquariusServer,
-                Context.Config.AquariusUsername,
-                Context.Config.AquariusPassword);
+                "doug-vm2012r2", //Context.Config.AquariusServer,
+                "admin", //Context.Config.AquariusUsername,
+                "admin"); //Context.Config.AquariusPassword);
 
             foreach (var serviceClient in new[]{client.Publish, client.Provisioning, client.Acquisition})
             {

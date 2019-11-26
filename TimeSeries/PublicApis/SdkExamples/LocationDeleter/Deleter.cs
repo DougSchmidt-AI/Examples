@@ -939,12 +939,18 @@ namespace LocationDeleter
 
             try
             {
+                Retry:
                 try
                 {
                     _processor.Delete(new DeleteMigrationLocationByIdentifier { LocationIdentifier = locationInfo.Identifier });
                 }
                 catch (WebServiceException exception)
                 {
+                    if (HandleDependentTimeSeriesException(exception))
+                    {
+                        goto Retry;
+                    }
+
                     if (exception.StatusCode != 400 && exception.StatusCode != 404) throw;
 
                     Log.Warn($"Trying alternative API to delete '{locationInfo.Identifier}' ...");
@@ -952,7 +958,7 @@ namespace LocationDeleter
                     var siteVisitLocation = GetSiteVisitLocation(locationInfo);
 
                     // Try the other API (not quite as robust)
-                    _processor.Delete(new DeleteLocationByIdRequest {LocationId = siteVisitLocation.Id});
+                    _processor.Delete(new DeleteLocationByIdRequest { LocationId = siteVisitLocation.Id });
                 }
             }
             catch (WebServiceException exception)
@@ -971,6 +977,54 @@ namespace LocationDeleter
 
             return location;
         }
+
+        private bool HandleDependentTimeSeriesException(WebServiceException exception, int nestingLevel = 0)
+        {
+            if (exception.StatusCode != 403 || exception.ErrorCode != "DependentTimeSeriesException")
+                return false;
+
+            if (nestingLevel > 20)
+            {
+                Log.Warn($"Nesting level {nestingLevel} is too deep man!");
+                return false;
+            }
+
+            var hack = exception.ResponseBody.FromJson<Hack>();
+
+            foreach (var timeSeriesId in hack.AdditionalInfo.DependentTimeSeries)
+            {
+                Log.Warn($"{nestingLevel}: Deleting dependent time-series Id {timeSeriesId} ...");
+
+                Retry:
+                try
+                {
+                    _processor.Delete(new DeleteTimeSeriesRequest { TimeSeriesId = timeSeriesId });
+                }
+                catch (WebServiceException e)
+                {
+                    if (HandleDependentTimeSeriesException(e, nestingLevel + 1))
+                    {
+                        goto Retry;
+                    }
+
+                    throw;
+                }
+            }
+
+            return true;
+        }
+
+        public class Hack
+        {
+            public AdditionalInfo AdditionalInfo { get; set; }
+        }
+
+        public class AdditionalInfo
+        {
+            public long[] DependentTimeSeries { get; set; }
+        }
+
+
 
         private string GetLocationSummary3X(LocationInfo location)
         {

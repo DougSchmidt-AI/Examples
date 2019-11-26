@@ -85,9 +85,9 @@ namespace SosExporter
         private ILegacyDataServiceClient CreateConnectedClient()
         {
             return LegacyDataServiceClient.Create(
-                HostUrl ?? Context.Config.AquariusServer,
-                Context.Config.AquariusUsername,
-                Context.Config.AquariusPassword);
+                HostUrl ?? "doug-vm2012r2", //Context.Config.AquariusServer,
+                "admin", //Context.Config.AquariusUsername,
+                "admin"); //Context.Config.AquariusPassword);
         }
 
         public void SaveConfiguration(DateTime nextChangesSinceToken)
